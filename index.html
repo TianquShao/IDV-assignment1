@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>IDV-assignment1 — PSI realtime table</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding: 24px; max-width: 1000px; margin: auto; }
+    h1 { margin: 0 0 8px 0; }
+    #meta { color: #444; margin-bottom: 6px; }
+    #status { color: #666; margin-bottom: 12px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f6f6f6; }
+    tbody tr:nth-child(even) { background: #fbfbfb; }
+    .small { font-size: 0.9rem; color:#666; }
+  </style>
+</head>
+<body>
+  <h1>PSI realtime readings — data.gov.sg</h1>
+  <div id="meta" class="small"></div>
+  <div id="status">Loading data…</div>
+  <table id="PSItable" aria-label="PSI readings table"></table>
+
+<script>
+const API = 'https://api.data.gov.sg/v1/environment/psi';
+
+async function loadPSI() {
+  const status = document.getElementById('status');
+  const meta = document.getElementById('meta');
+  const table = document.getElementById('PSItable');
+
+  try {
+    const resp = await fetch(API);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+
+    // items[0] contains latest readings
+    const item = (data.items && data.items[0]) || null;
+    if (!item) throw new Error('No data.items found in API response');
+
+    // Get timestamp (be flexible about key name)
+    const ts = item.timestamp || item.update_timestamp || item.update;
+    meta.innerHTML = `<strong>Timestamp:</strong> ${ts || 'N/A'} &nbsp; <span class="small">(source: ${API})</span>`;
+
+    // readings object containing multiple metrics
+    const readings = item.readings;
+    const metrics = Object.keys(readings);
+
+    // Determine regions dynamically (robust if API adds/removes regions)
+    const regionKeys = metrics.length ? Object.keys(readings[metrics[0]]) : [];
+
+    // Build table header
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    headerRow.appendChild(makeCell('Metric','th'));
+    regionKeys.forEach(r => headerRow.appendChild(makeCell(r,'th')));
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Build table body rows
+    const tbody = document.createElement('tbody');
+    metrics.forEach(metric => {
+      const tr = document.createElement('tr');
+      tr.appendChild(makeCell(metric,'td'));
+      regionKeys.forEach(region => {
+        const v = readings[metric] && readings[metric][region];
+        tr.appendChild(makeCell(v !== undefined && v !== null ? v : '', 'td'));
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    status.textContent = 'Loaded successfully.';
+  } catch (err) {
+    status.textContent = 'Error loading data: ' + err.message;
+    console.error(err);
+  }
+}
+
+function makeCell(text, tag='td') {
+  const el = document.createElement(tag);
+  el.textContent = text;
+  return el;
+}
+
+loadPSI();
+</script>
+</body>
+</html>
